@@ -2,20 +2,49 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdint.h>
-
+#include <stdlib.h>
 
 #define DEFAULT_PIXELS_NUM 72
 #define DEFAULT_PX_REV_NUM 60
 #define DEFAULT_SPEED_NUM 1
 #define DEFAULT_FRAMES_ANIMATION 10
 
-struct Pixel {
+struct pixel {
 	unsigned char r;
 	unsigned char g;
 	unsigned char b;
 };
 
-#define RGB(r, g, b) ((struct Pixel) {r, g, b})
+//help with pixel_data structure from eric mueller; adapted from following code:
+//   	https://gist.github.com/hmc-cs-emueller/c4ebbe9f3b4064fed16a
+
+struct pixel_data {
+	//m: pixels per colum
+	//n: columns per image
+	//k: frames per animation
+    unsigned m, n, k;
+    struct pixel *data;
+};
+
+struct pixel *get_pixel(struct pixel_data *a, unsigned x, unsigned y, unsigned z)
+{
+    unsigned m = a->m;
+    unsigned n = a->n;
+    unsigned k = a->k;
+    struct pixel *data = a->data;
+    
+    // do some bounds checking here or yolo, whatever
+    if (x >= m || y >= n || z >= k) {
+        printf("%s: index out of bounds\n", __func__);
+        return NULL;
+    }
+
+    return &a->data[x*m*n + y*n + z];
+}
+
+
+
+#define RGB(r, g, b) ((struct pixel) {r, g, b})
 
 #define RED RGB(0xff, 0, 0)
 #define GREEN RGB(0, 0xff, 0)
@@ -42,8 +71,16 @@ int main(){
 		printf("There are %d pixels in the strip.\nThere are %d horizontal pixels in one revolution.\nThere are %d revolutions between each frame.\nThere are %d frames in one animation.", pixels,revs,speed,total_frames);
 		char junk;
 		fscanf(fp, "%c%c%c%c", &junk, &junk, &junk, &junk);
-		struct Pixel frames[4][4][4];
-		fread(frames, sizeof(char), sizeof(frames), fp);
+		
+		struct pixel_data frames;
+		
+		frames.m = pixels;
+		frames.n = revs;
+		frames.k = total_frames;
+
+		unsigned long size = pixels * sizeof(struct pixel) * revs * total_frames;
+		frames.data = malloc(size);
+		fread(frames.data, sizeof(struct pixel), size, fp);
 	} else {
 		fp = fopen(fname,"w");
 		printf("pixels/strip (0-255) [default: 72] ");
@@ -54,7 +91,6 @@ int main(){
 
 		printf("pixels/revolution (0-255) [default: 60] ");
 		scanf("%i", &input);
-		pixels = (uint8_t)input;
 		if (input < 1 || input > 255) input = DEFAULT_PX_REV_NUM;
 		revs = (uint8_t)input;
 		fprintf(fp, "%c", revs);
@@ -71,13 +107,18 @@ int main(){
 		total_frames = (uint8_t)input;
 		fprintf(fp, "%c", total_frames);
 		
-		fprintf(fp, "%c%c%c%c", 0,0,0,0);
-		
-		struct Pixel frames;
-		malloc((sizeof(struct Pixel))*total_frames*revs*pixels);
+		struct pixel_data frames;
+		frames.m = pixels;
+		frames.n = revs;
+		frames.k = total_frames;
 
-		frames[0][0][0] = RED;
-		fwrite(frames, sizeof(char), sizeof(frames), fp);
+		unsigned long size = pixels * sizeof(struct pixel) * revs * total_frames;
+		frames.data = malloc(size);
+		
+// 		struct pixel *p = get_pixel(&frames, 2, 2, 2);
+// 		p->g = 0xff;
+
+		fwrite(frames.data, sizeof(char), size, fp);
 	}
 
 	fclose(fp);

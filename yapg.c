@@ -13,7 +13,7 @@
 #define COLORS 3
 #define RPM 500
 #define FRAMES 40
-#define RGB(r, g, b) ((struct Pixel) {r, g, b})
+#define RGB(r, g, b) ((struct pixel) {r, g, b})
 
 #define RED RGB(0xff, 0, 0)
 #define GREEN RGB(0, 0xff, 0)
@@ -22,13 +22,38 @@
 #define WHITE RGB(0xff,0xff,0xff)
 #define WHITE_64 RGB(0x80,0x80,0x80)
 
-struct Pixel {
-	unsigned char r;
-	unsigned char g;
-	unsigned char b;
+struct pixel {
+	unsigned char r, g, b;
 };
 
-void setLED (struct Pixel p){
+//help with pixel_data structure from eric mueller; adapted from following code:
+//   	https://gist.github.com/hmc-cs-emueller/c4ebbe9f3b4064fed16a
+
+struct pixel_data {
+	//m: pixels per colum
+	//n: columns per image
+	//k: frames per animation
+    unsigned m, n, k;
+    struct pixel *data;
+};
+
+struct pixel *get_pixel(struct pixel_data *a, unsigned x, unsigned y, unsigned z)
+{
+    unsigned m = a->m;
+    unsigned n = a->n;
+    unsigned k = a->k;
+    struct pixel *data = a->data;
+    
+    // do some bounds checking here or yolo, whatever
+    if (x >= m || y >= n || z >= k) {
+        printf("%s: index out of bounds\n", __func__);
+        return NULL;
+    }
+
+    return &a->data[x*m*n + y*n + z];
+}
+
+void setLED (struct pixel p){
 	if (LEDOUT){
 		spiSendReceive(0xff);
 		spiSendReceive(p.b);
@@ -43,18 +68,18 @@ void initFrame (){
 }
 
 void endFrame (){
-	struct Pixel p = {0xff,0xff,0xff};
+	struct pixel p = {0xff,0xff,0xff};
 	setLED(p);
 	setLED(p);
 }
 
 
-void displayFrame(struct Pixel frames[FRAMES][LEDS], int framenum){
+void displayFrame(struct pixel frames[FRAMES][LEDS], int framenum){
 	int i;
 	initFrame();
 	if (DEBUG == 1) printf("begin frame %d\n", framenum);
 	for (i=0;i<LEDS;i++){	
-		struct Pixel p = frames[framenum][i]; 
+		struct pixel p = frames[framenum][i]; 
 		if (DEBUG){
 			printf("%02d 0x%02x%02x%02x ",i,p.b,p.g,p.r);
 		}
@@ -65,18 +90,17 @@ void displayFrame(struct Pixel frames[FRAMES][LEDS], int framenum){
 
 }
 
-void clearFrame(struct Pixel frames[FRAMES][LEDS]){
+void clearFrame(struct pixel frames[FRAMES][LEDS]){
 	memset(*frames, 0, sizeof(*frames));
 }
 
-void updateSine(struct Pixel frames[FRAMES][LEDS], int amplitude){
+void updateSine(struct pixel frames[FRAMES][LEDS], int amplitude){
 	int i;
 	clearFrame(frames);
 	for (i = 0; i < FRAMES; ++i){
 		int sinx = (int)(amplitude * (1 + sin(PI * i * 2 / (FRAMES/2.0))));
 		frames[i][sinx] = WHITE;
 	}
-
 }
 
 int main() {
@@ -89,7 +113,7 @@ int main() {
 		delayMicros(1000000);
 	}
 	
-	struct Pixel frames[FRAMES][LEDS] = {{0}};
+	struct pixel frames[FRAMES][LEDS] = {{0}};
 	int framenum = 0;
 
 	//	frames per revolution: FRAMES
@@ -105,7 +129,7 @@ int main() {
 	
 	updateSine(frames, amplitude);
 	
-	while(revolutions < 10){
+	while(revolutions < 5){
 
 		displayFrame(frames,framenum);
 		
@@ -116,6 +140,7 @@ int main() {
 		if (framenum == FRAMES - 1){
 			++revolutions;
 		}
+		
 		if (framenum == 0){
 			if (amplitude == LEDS/2-1){
 				dir = -1;
@@ -124,7 +149,6 @@ int main() {
 				dir = 1;
 			}
 			amplitude += dir;
-			
 			updateSine(frames,amplitude);
 		}
 	}
