@@ -3,7 +3,11 @@
 
 #include "easyPIO.h"
 #include <math.h>
+#include <string.h>
 #define PI 3.14159265
+
+#define LEDOUT 0
+#define DEBUG 1
 
 #define LEDS 72
 #define COLORS 3
@@ -11,62 +15,80 @@
 #define FRAMES 40
 #define RGB(r, g, b) ((struct Pixel) {r, g, b})
 
-#define RED RGB(255, 0, 0)
-#define GREEN RGB(0, 255, 0)
-#define BLUE RGB(0, 0, 255)
+#define RED RGB(0xff, 0, 0)
+#define GREEN RGB(0, 0xff, 0)
+#define BLUE RGB(0, 0, 0xff)
 
-#define WHITE RGB(255,255,255)
-#define WHITE_64 RGB(64,64,64)
+#define WHITE RGB(0xff,0xff,0xff)
+#define WHITE_64 RGB(0x80,0x80,0x80)
 
 struct Pixel {
-	char r;
-	char g;
-	char b;
+	unsigned char r;
+	unsigned char g;
+	unsigned char b;
 };
 
 void setLED (struct Pixel p){
-	//printf("%x%x%x",p.b,p.g,p.r);
-	spiSendReceive(0xff);
-	spiSendReceive(p.b);
-	spiSendReceive(p.g);
-	spiSendReceive(p.r);
+	if (LEDOUT){
+		spiSendReceive(0xff);
+		spiSendReceive(p.b);
+		spiSendReceive(p.g);
+		spiSendReceive(p.r);
+	}
 }
 
 void initFrame (){
 	int i;
-	for (i=0;i<4;i++) spiSendReceive(0x00);
+	if (LEDOUT) for (i=0;i<4;i++) spiSendReceive(0x00);
 }
 
 void endFrame (){
-	struct Pixel p = {255,255,255};
+	struct Pixel p = {0xff,0xff,0xff};
+	setLED(p);
 	setLED(p);
 }
 
 
-void writeFrame(struct Pixel frames[FRAMES][LEDS], int framenum){
+void displayFrame(struct Pixel frames[FRAMES][LEDS], int framenum){
 	int i;
 	initFrame();
-	for (i=0;i<LEDS+1;i++){	
-		setLED(frames[framenum][i]);
+	if (DEBUG == 1) printf("begin frame %d\n", framenum);
+	for (i=0;i<LEDS;i++){	
+		struct Pixel p = frames[framenum][i]; 
+		if (DEBUG){
+			printf("%02d 0x%02x%02x%02x ",i,p.b,p.g,p.r);
+		}
+		setLED(p);
+		if (DEBUG && ((i+1) % 8 == 0)) printf("\n");
 	}
 	endFrame();
+
 }
 
-void updateSine(struct Pixel frames[FRAMES][LEDS], int framenum){
+void clearFrame(struct Pixel frames[FRAMES][LEDS]){
+	memset(*frames, 0, sizeof(*frames));
+}
+
+void updateSine(struct Pixel frames[FRAMES][LEDS], int amplitude){
 	int i;
+	clearFrame(frames);
 	for (i = 0; i < FRAMES; ++i){
-		frames[i][(int)((LEDS/2-1) * (1 + sin(PI * i * 2 / (FRAMES/2.0))))] = BLUE;
+		int sinx = (int)(amplitude * (1 + sin(PI * i * 2 / (FRAMES/2.0))));
+		frames[i][sinx] = WHITE;
 	}
+
 }
 
 int main() {
 
-	pioInit();
-	pinMode(20, OUTPUT);
-	spiInit(1000000);
-	digitalWrite(20, 1);
-	delayMicros(1000000);
-
+	if (LEDOUT){
+		pioInit();
+		pinMode(20, OUTPUT);
+		spiInit(1000000);
+		digitalWrite(20, 1);
+		delayMicros(1000000);
+	}
+	
 	struct Pixel frames[FRAMES][LEDS] = {{0}};
 	int framenum = 0;
 
@@ -77,14 +99,37 @@ int main() {
 	// 	microseconds per frame: 1000000 * 60 / FRAMES / RPM
 
 	int delay = 1000000 * 60 / (FRAMES * RPM);
+	int amplitude = LEDS/2-1;
+	int dir = -1;
+	int revolutions = 0;
 	
-	updateSine(frames, 0);
-	int i;
-	while(1){
-		writeFrame(frames,framenum);
-		delayMicros(delay);
-		framenum = framenum + 1;
-		if (framenum == FRAMES) framenum = 0;
+	updateSine(frames, amplitude);
+	
+	while(revolutions < 10){
+
+		displayFrame(frames,framenum);
+		
+		if (LEDOUT) delayMicros(delay);
+		
+		framenum = ((framenum + 1) % FRAMES);
+		
+		if (framenum == FRAMES - 1){
+			++revolutions;
+		}
+		if (framenum == 0){
+			if (amplitude == LEDS/2-1){
+				dir = -1;
+			}
+			else if (amplitude == 0){
+				dir = 1;
+			}
+			amplitude += dir;
+			
+			updateSine(frames,amplitude);
+		}
 	}
+	
+	
+	return(0);
 }
 
