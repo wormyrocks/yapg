@@ -1,3 +1,4 @@
+#include <ncurses.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -31,17 +32,14 @@ struct pixel *get_pixel(struct pixel_data *a, unsigned x, unsigned y, unsigned z
     unsigned m = a->m;
     unsigned n = a->n;
     unsigned k = a->k;
-    struct pixel *data = a->data;
     
     // do some bounds checking here or yolo, whatever
     if (x >= m || y >= n || z >= k) {
         printf("%s: index out of bounds\n", __func__);
         return NULL;
     }
-
-    return &a->data[x*m*n + y*n + z];
+	return &(a->data[x*m*n + y*n + z]);
 }
-
 
 
 #define RGB(r, g, b) ((struct pixel) {r, g, b})
@@ -63,7 +61,10 @@ int main(){
 	uint8_t revs;
 	uint8_t speed;
 	uint8_t total_frames;
-	
+	struct pixel_data frames;
+
+
+
 	if( access( fname, F_OK ) != -1 ) {
 		printf("File exists. Reading...\n");
 		fp = fopen(fname, "r+");
@@ -72,15 +73,17 @@ int main(){
 		char junk;
 		fscanf(fp, "%c%c%c%c", &junk, &junk, &junk, &junk);
 		
-		struct pixel_data frames;
 		
 		frames.m = pixels;
 		frames.n = revs;
 		frames.k = total_frames;
 
-		unsigned long size = pixels * sizeof(struct pixel) * revs * total_frames;
+		unsigned long size = frames.m * frames.n * frames.k * sizeof(struct pixel);
 		frames.data = malloc(size);
-		fread(frames.data, sizeof(struct pixel), size, fp);
+		memset(frames.data, 0x00, size);
+		fread(frames.data, sizeof(char), size, fp);
+
+
 	} else {
 		fp = fopen(fname,"w");
 		printf("pixels/strip (0-255) [default: 72] ");
@@ -106,22 +109,38 @@ int main(){
 		if (input < 1 || input > 255) input = DEFAULT_FRAMES_ANIMATION;
 		total_frames = (uint8_t)input;
 		fprintf(fp, "%c", total_frames);
+	
+		fprintf(fp, "%c%c%c%c", 0x00, 0x00, 0x00, 0x00);
 		
-		struct pixel_data frames;
 		frames.m = pixels;
 		frames.n = revs;
 		frames.k = total_frames;
 
-		unsigned long size = pixels * sizeof(struct pixel) * revs * total_frames;
+		unsigned long size = frames.m * frames.n * frames.k * sizeof(struct pixel);
 		frames.data = malloc(size);
+		memset(frames.data, 0x00, size);
 		
-// 		struct pixel *p = get_pixel(&frames, 2, 2, 2);
-// 		p->g = 0xff;
-
 		fwrite(frames.data, sizeof(char), size, fp);
 	}
 
+	initscr();
+	int i;
+	int j;
+
+	struct pixel *p;
+	for (i = 0; i < frames.m; ++i){
+		for (j = 0; j < frames.n; ++j){
+			p = get_pixel(&frames, i, j, 0);
+			if (p->r > 0 || p->g > 0 || p->g > 0) printw("o");
+			else printw(".");
+		}
+		printw("\n");
+	}
+	move(0,0);
+	refresh();
+	getch();
 	fclose(fp);
+	endwin();
 	return (0);
 
 }
