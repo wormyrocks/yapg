@@ -37,6 +37,14 @@ struct pixel *getPixel(struct pixel *frames, unsigned i, unsigned j, unsigned k)
 	return frames + addr;
 }
 
+void save(FILE *fp, struct pixel *frames){
+	unsigned long size = pixels * revs * total_frames * sizeof(struct pixel);
+	rewind(fp);
+	fprintf(fp, "%c%c%c%c", pixels, revs, speed, total_frames);
+	fprintf(fp, "%c%c%c%c", 0x00, 0x00, 0x00, 0x00);
+	fwrite(frames, sizeof(char), size, fp);
+}
+
 int main(){
 	char fname[64];
 
@@ -71,27 +79,21 @@ int main(){
 		scanf("%i", &input);
 		if (input < 1 || input > 255) input = DEFAULT_PIXELS_NUM;
 		pixels = (uint8_t)input;
-		fprintf(fp, "%c", pixels);
 
 		printf("pixels/revolution (0-255) [default: 60] ");
 		scanf("%i", &input);
 		if (input < 1 || input > 255) input = DEFAULT_PX_REV_NUM;
 		revs = (uint8_t)input;
-		fprintf(fp, "%c", revs);
 		
 		printf("number of frames between update (0-255) [default: 1] ");
 		scanf("%i", &input);
 		if (input < 1 || input > 255) input = DEFAULT_SPEED_NUM;
 		speed = (uint8_t)input;
-		fprintf(fp, "%c", speed);
 
 		printf("number of frames in your animation (0-255) [default: 10] ");
 		scanf("%i", &input);
 		if (input < 1 || input > 255) input = DEFAULT_FRAMES_ANIMATION;
 		total_frames = (uint8_t)input;
-		fprintf(fp, "%c", total_frames);
-	
-		fprintf(fp, "%c%c%c%c", 0x00, 0x00, 0x00, 0x00);
 		
 		unsigned long size = pixels * revs * total_frames * sizeof(struct pixel);
 		frames = malloc(size);
@@ -100,7 +102,7 @@ int main(){
 			exit(1);
 		}
 		memset(frames, 0x00, size);
-		fwrite(frames, sizeof(char), size, fp);
+		save(fp, frames);
 	}
 
 	initscr();
@@ -180,7 +182,7 @@ int main(){
 					refresh();
 					ch = getch();
 				}
-				while (ch != 0xa && ch != 0x71 && ch != );
+				while (ch != 0xa && ch != 0x71);
 				move(pixels + VSPACE + 1,0);
 				printw("\n");
 				noecho();
