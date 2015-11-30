@@ -2,17 +2,19 @@
 // e155, final project
 
 #include "easyPIO.h"
-#include <math.h>
 #include <string.h>
+#include <unistd.h>
+#include <stdint.h>
+
+
+
 #define PI 3.14159265
 
 #define LEDOUT 0
 #define DEBUG 1
 
-#define LEDS 72
-#define COLORS 3
 #define RPM 500
-#define FRAMES 40
+
 #define RGB(r, g, b) ((struct pixel) {r, g, b})
 
 #define RED RGB(0xff, 0, 0)
@@ -22,6 +24,8 @@
 #define WHITE RGB(0xff,0xff,0xff)
 #define WHITE_64 RGB(0x80,0x80,0x80)
 
+uint8_t pixels, revs, total_frames, speed;
+
 struct pixel {
 	unsigned char r, g, b;
 };
@@ -29,36 +33,20 @@ struct pixel {
 //help with pixel_data structure from eric mueller; adapted from following code:
 //   	https://gist.github.com/hmc-cs-emueller/c4ebbe9f3b4064fed16a
 
-struct pixel_data {
-	//m: pixels per colum
-	//n: columns per image
-	//k: frames per animation
-    unsigned m, n, k;
-    struct pixel *data;
-};
-
-struct pixel *get_pixel(struct pixel_data *a, unsigned x, unsigned y, unsigned z)
-{
-    unsigned m = a->m;
-    unsigned n = a->n;
-    unsigned k = a->k;
-    struct pixel *data = a->data;
-    
-    // do some bounds checking here or yolo, whatever
-    if (x >= m || y >= n || z >= k) {
-        printf("%s: index out of bounds\n", __func__);
-        return NULL;
-    }
-
-    return &a->data[x*m*n + y*n + z];
+struct pixel *getPixel(struct pixel *frames, unsigned i, unsigned j, unsigned k){
+	unsigned addr = i + j * pixels + k * pixels * revs;
+// 	11 / 1
+// 	51 / 0
+// 	printf("start%d %d %u ", i,j,addr);
+	return frames + addr;
 }
 
-void setLED (struct pixel p){
+void setLED (struct pixel *p){
 	if (LEDOUT){
 		spiSendReceive(0xff);
-		spiSendReceive(p.b);
-		spiSendReceive(p.g);
-		spiSendReceive(p.r);
+		spiSendReceive(p->b);
+		spiSendReceive(p->g);
+		spiSendReceive(p->r);
 	}
 }
 
@@ -68,20 +56,24 @@ void initFrame (){
 }
 
 void endFrame (){
-	struct pixel p = {0xff,0xff,0xff};
-	setLED(p);
-	setLED(p);
+	if (LEDOUT){
+		spiSendReceive(0xff);
+		spiSendReceive(0xff);
+		spiSendReceive(0xff);
+		spiSendReceive(0xff);
+	}
 }
 
 
-void displayFrame(struct pixel frames[FRAMES][LEDS], int framenum){
+void lightUp(struct pixel *frames, int revnum, int framenum){
 	int i;
 	initFrame();
-	if (DEBUG == 1) printf("begin frame %d\n", framenum);
-	for (i=0;i<LEDS;i++){	
-		struct pixel p = frames[framenum][i]; 
+	struct pixel *p;
+	if (DEBUG == 1) printf("\nbegin horiz %d\n", revnum);
+	for (i=0;i<pixels;i++){	
+		p = getPixel(frames, i, revnum, framenum);
 		if (DEBUG){
-			printf("%02d 0x%02x%02x%02x ",i,p.b,p.g,p.r);
+			printf("%02d 0x%02x%02x%02x ",i,p->b,p->g,p->r);
 		}
 		setLED(p);
 		if (DEBUG && ((i+1) % 8 == 0)) printf("\n");
@@ -90,18 +82,6 @@ void displayFrame(struct pixel frames[FRAMES][LEDS], int framenum){
 
 }
 
-void clearFrame(struct pixel frames[FRAMES][LEDS]){
-	memset(*frames, 0, sizeof(*frames));
-}
-
-void updateSine(struct pixel frames[FRAMES][LEDS], int amplitude){
-	int i;
-	clearFrame(frames);
-	for (i = 0; i < FRAMES; ++i){
-		int sinx = (int)(amplitude * (1 + sin(PI * i * 2 / (FRAMES/2.0))));
-		frames[i][sinx] = WHITE;
-	}
-}
 
 int main() {
 
@@ -113,8 +93,7 @@ int main() {
 		delayMicros(1000000);
 	}
 	
-	struct pixel frames[FRAMES][LEDS] = {{0}};
-	int framenum = 0;
+	int revnum = 0;
 
 	//	frames per revolution: FRAMES
 	// 	revolutions per second: RPM/60
@@ -122,38 +101,61 @@ int main() {
 	// 	seconds per frame: 60/FRAMES/RPM
 	// 	microseconds per frame: 1000000 * 60 / FRAMES / RPM
 
-	int delay = 1000000 * 60 / (FRAMES * RPM);
-	int amplitude = LEDS/2-1;
-	int dir = -1;
-	int revolutions = 0;
-	
-	updateSine(frames, amplitude);
-	
-	while(revolutions < 5){
+	unsigned revolutions = 0;
 
-		displayFrame(frames,framenum);
+	struct pixel *frames;
+	
+	char fname[64];
+	int done = 0;
+	FILE *fp;
+	do{
+		printf("Enter filename: ");
+		scanf("%s",fname);
+		strcat(fname, ".led");
+
+	if( access( fname, F_OK ) != -1 ) {	
+		fp = fopen(fname, "r");
+		fscanf(fp, "%c%c%c%c", &pixels, &revs, &speed, &total_frames);
+		char junk;
+		fscanf(fp, "%c%c%c%c", &junk, &junk, &junk, &junk);
+		
+		unsigned long size = pixels * revs * total_frames * sizeof(struct pixel);
+		frames = malloc(size);
+		if (!frames){
+			printf("malloc failed");
+			exit(1);
+		}
+		memset(frames, 0x00, size);
+		fread(frames, sizeof(char), size, fp);
+		done = 1;
+
+	}else{
+		printf("not found.\n");
+	}
+	}while (!done);
+	
+	int delay = 1000000 * 60 / (revs * RPM);
+	int framenum = 0;
+
+	while(revolutions < 2){
+
+		lightUp(frames,revnum, framenum);
 		
 		if (LEDOUT) delayMicros(delay);
 		
-		framenum = ((framenum + 1) % FRAMES);
+		revnum = ((revnum + 1) % revs);
 		
-		if (framenum == FRAMES - 1){
+		if (revnum == revs - 1){
 			++revolutions;
+			exit(1);
 		}
-		
-		if (framenum == 0){
-			if (amplitude == LEDS/2-1){
-				dir = -1;
-			}
-			else if (amplitude == 0){
-				dir = 1;
-			}
-			amplitude += dir;
-			updateSine(frames,amplitude);
+		if (revolutions == speed){
+			revolutions = 0;
+			framenum = ((framenum + 1)%total_frames);
 		}
 	}
 	
-	
+	printf("\n");
 	return(0);
 }
 

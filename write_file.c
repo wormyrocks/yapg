@@ -33,7 +33,7 @@ uint8_t total_frames;
 #define BLUE RGB(0, 0, 0xff)
 
 struct pixel *getPixel(struct pixel *frames, unsigned i, unsigned j, unsigned k){
-	unsigned addr = i + j * revs + k * pixels * revs;
+	unsigned long addr = i + j * pixels + k * pixels * revs;
 	return frames + addr;
 }
 
@@ -43,6 +43,21 @@ void save(FILE *fp, struct pixel *frames){
 	fprintf(fp, "%c%c%c%c", pixels, revs, speed, total_frames);
 	fprintf(fp, "%c%c%c%c", 0x00, 0x00, 0x00, 0x00);
 	fwrite(frames, sizeof(char), size, fp);
+}
+
+void refresh_data(struct pixel *frames, unsigned z){
+	move(VSPACE,0);
+	unsigned i,j,k;
+	struct pixel *p;
+	unsigned addr;
+	for (i = 0; i < pixels; ++i){
+		for (j = 0; j < revs; ++j){
+			p = getPixel(frames, i, j, z);
+ 			if (p->r + p->g + p->g > 0) printw("o");
+ 			else printw(".");
+		}
+		printw("\n");
+	}
 }
 
 int main(){
@@ -111,26 +126,21 @@ int main(){
 	unsigned i;
 	unsigned j;
 	unsigned y,x;
+	unsigned z = 0;
+		
 	unsigned my = 0, mx = 0;
+	char str[10];
 	int ch;
 	noecho();
 	printw("striplen %d pixels/rev %d framerate %d num. frames %d\n", pixels,revs,speed,total_frames);
+	struct pixel *q;
 
-	struct pixel *p;
-	unsigned addr;
-	for (i = 0; i < pixels; ++i){
-		for (j = 0; j < revs; ++j){
-			p = getPixel(frames, i, j, 0);
- 			if (p->r + p->g + p->g > 0) printw("o");
- 			else printw(".");
-		}
-		printw("\n");
-	}
+	refresh_data(frames, z);
 	
 	move(pixels + VSPACE, 0);
 	printw("\n");
 	move(pixels + VSPACE, 0);
-	printw("x: %d, y: %d",mx, my);
+	printw("x: %d, y: %d, frame: %d",mx, my, z);
 	move(VSPACE,0);
 	while((ch = getch()) != 0x71)
 	{
@@ -171,11 +181,21 @@ int main(){
 			case 0x4b:
 				my = (my + 5) % pixels;
 				break;
+			case 0x75:
+				if (z == 0) z = total_frames - 1;
+				else --z;
+				refresh_data(frames, z);
+				break;
+			case 0x6f:
+				if (z == total_frames - 1) z = 0;
+				else ++z;
+				refresh_data(frames, z);
+				break;
 			case 0xa:
 				move(pixels+VSPACE+1, 0);
 				echo();
 				do {
-					struct pixel *q = getPixel(frames, mx, my, 0);
+					q = getPixel(frames, my, mx, 0);
 					printw("Pixel color: 0x%02x%02x%02x", q->r,q->g,q->b);
 					move(pixels + VSPACE + 1, 15);
 					getyx(stdscr, y, x);
@@ -192,7 +212,9 @@ int main(){
 		x = mx;
 		y = my + VSPACE;
 		move(pixels + VSPACE,0);
-		printw("x: %d, y: %d",mx, my);
+		printw("\n");
+		move(pixels + VSPACE,0);
+		printw("x: %d, y: %d, frame: %d",mx, my, z);
 		move (y, x);
 		refresh();
 	}
