@@ -26,11 +26,6 @@ uint8_t total_frames;
 //help with pixel_data structure from eric mueller; adapted from following code:
 //   	https://gist.github.com/hmc-cs-emueller/c4ebbe9f3b4064fed16a
 
-#define RGB(r, g, b) ((struct pixel) {r, g, b})
-
-#define RED RGB(0xff, 0, 0)
-#define GREEN RGB(0, 0xff, 0)
-#define BLUE RGB(0, 0, 0xff)
 
 struct pixel *getPixel(struct pixel *frames, unsigned i, unsigned j, unsigned k){
 	unsigned long addr = i + j * pixels + k * pixels * revs;
@@ -53,7 +48,7 @@ void refresh_data(struct pixel *frames, unsigned z){
 	for (i = 0; i < pixels; ++i){
 		for (j = 0; j < revs; ++j){
 			p = getPixel(frames, i, j, z);
- 			if (p->r + p->g + p->g > 0) printw("o");
+ 			if (p->r + p->g + p->b > 0) printw("o");
  			else printw(".");
 		}
 		printw("\n");
@@ -121,17 +116,21 @@ int main(){
 	}
 
 	initscr();
+	noecho();
+	printw("ijkl - move cursor\nenter - change value\ns - save\nu/o - change frames\nq - quit\n");
 	keypad(stdscr, TRUE);
-
+	getch();
+	move(0,0);
 	unsigned i;
 	unsigned j;
-	unsigned y,x;
+	unsigned y,x, xb;
 	unsigned z = 0;
 		
 	unsigned my = 0, mx = 0;
-	char str[10];
-	int ch;
-	noecho();
+	char str[6];
+
+	unsigned ch, m;
+	unsigned done;
 	printw("striplen %d pixels/rev %d framerate %d num. frames %d\n", pixels,revs,speed,total_frames);
 	struct pixel *q;
 
@@ -142,8 +141,9 @@ int main(){
 	move(pixels + VSPACE, 0);
 	printw("x: %d, y: %d, frame: %d",mx, my, z);
 	move(VSPACE,0);
-	while((ch = getch()) != 0x71)
+	while(!done)
 	{
+		ch = getch();
 		getyx(stdscr, y, x);	
 		my = y - VSPACE;
 		mx = x;
@@ -192,29 +192,58 @@ int main(){
 				refresh_data(frames, z);
 				break;
 			case 0xa:
+				xb = mx;
 				move(pixels+VSPACE+1, 0);
-				echo();
-				do {
-					q = getPixel(frames, my, mx, 0);
-					printw("Pixel color: 0x%02x%02x%02x", q->r,q->g,q->b);
-					move(pixels + VSPACE + 1, 15);
-					getyx(stdscr, y, x);
-					refresh();
-					ch = getch();
-				}
-				while (ch != 0xa && ch != 0x71);
-				move(pixels + VSPACE + 1,0);
-				printw("\n");
-				noecho();
-				break;
+				q = getPixel(frames, my, mx, z);
+				unsigned rgb;
 
+				printw("Pixel color: 0x%02x%02x%02x\nNew value:   0x", q->r,q->g,q->b);
+				move(pixels + VSPACE + 2, 15);
+				echo();
+				getnstr(str, 6);
+				unsigned numchars;
+				if (sscanf(str, "%06x%n", &rgb, &numchars) == 1 && numchars == 6){
+					q->r = (rgb & 0xff0000) >> 0x10;
+					q->g = (rgb & 0x00ff00) >> 0x8;
+					q->b = (rgb & 0x0000ff);
+					refresh_data(frames,z);
+				}
+				move(pixels + VSPACE + 1,0);
+				printw("\n\n");
+				noecho();
+				mx = xb;
+				break;
+			case 0x73:
+				move(pixels + VSPACE + 1,0);
+				printw("Saved.");
+				save(fp, frames);
+				refresh();
+				getch();
+				break;
+			case 0x71:
+				move(pixels + VSPACE + 1,0);
+				printw("Save (s) Quit (q)");
+				m = getch();
+				switch(m){
+					case 0x73:
+						save(fp, frames);
+						done = 1;
+						break;
+					case 0x71:
+						done = 1;
+						break;
+					default:
+						move(pixels + VSPACE + 1,0);
+						printw("\n");
+				}
+				break;
 		}
 		x = mx;
 		y = my + VSPACE;
 		move(pixels + VSPACE,0);
 		printw("\n");
 		move(pixels + VSPACE,0);
-		printw("x: %d, y: %d, frame: %d",mx, my, z);
+		printw("x: %d, y: %d, frame: %d\n\n",mx, my, z);
 		move (y, x);
 		refresh();
 	}
