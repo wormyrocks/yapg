@@ -62,7 +62,7 @@ int main(){
 	scanf("%s",fname);
 	strcat(fname, ".led");
 	FILE *fp;
-	
+
 	int input;
 
 	struct pixel *frames;
@@ -72,7 +72,7 @@ int main(){
 		fscanf(fp, "%c%c%c%c", &pixels, &revs, &speed, &total_frames);
 		char junk;
 		fscanf(fp, "%c%c%c%c", &junk, &junk, &junk, &junk);
-		
+
 		unsigned long size = pixels * revs * total_frames * sizeof(struct pixel);
 		frames = malloc(size);
 		if (!frames){
@@ -94,7 +94,7 @@ int main(){
 		scanf("%i", &input);
 		if (input < 1 || input > 255) input = DEFAULT_PX_REV_NUM;
 		revs = (uint8_t)input;
-		
+
 		printf("number of frames between update (0-255) [default: 1] ");
 		scanf("%i", &input);
 		if (input < 1 || input > 255) input = DEFAULT_SPEED_NUM;
@@ -104,7 +104,7 @@ int main(){
 		scanf("%i", &input);
 		if (input < 1 || input > 255) input = DEFAULT_FRAMES_ANIMATION;
 		total_frames = (uint8_t)input;
-		
+
 		unsigned long size = pixels * revs * total_frames * sizeof(struct pixel);
 		frames = malloc(size);
 		if (!frames){
@@ -117,25 +117,25 @@ int main(){
 
 	initscr();
 	noecho();
+	unsigned y, x, xb;
 	printw("ijkl - move cursor\nenter - change value\ns - save\nu/o - change frames\nq - quit\n");
 	keypad(stdscr, TRUE);
 	getch();
 	move(0,0);
 	unsigned i;
 	unsigned j;
-	unsigned y,x, xb;
 	unsigned z = 0;
-		
+
 	unsigned my = 0, mx = 0;
 	char str[6];
 
 	unsigned ch, m;
 	unsigned done;
+	done = 0;
 	printw("striplen %d pixels/rev %d framerate %d num. frames %d\n", pixels,revs,speed,total_frames);
 	struct pixel *q;
 
 	refresh_data(frames, z);
-	
 	move(pixels + VSPACE, 0);
 	printw("\n");
 	move(pixels + VSPACE, 0);
@@ -144,7 +144,7 @@ int main(){
 	while(!done)
 	{
 		ch = getch();
-		getyx(stdscr, y, x);	
+		getyx(stdscr, y, x);
 		my = y - VSPACE;
 		mx = x;
 		switch(ch)
@@ -247,9 +247,8 @@ int main(){
 		move (y, x);
 		refresh();
 	}
-	
+
 	fclose(fp);
 	endwin();
 	return (0);
-
 }
