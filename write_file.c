@@ -44,7 +44,7 @@ void refresh_data(struct pixel *frames, unsigned z){
 	move(VSPACE,0);
 	unsigned i,j,k;
 	struct pixel *p;
-	unsigned addr;
+
 	for (i = 0; i < pixels; ++i){
 		for (j = 0; j < revs; ++j){
 			p = getPixel(frames, i, j, z);
@@ -52,6 +52,90 @@ void refresh_data(struct pixel *frames, unsigned z){
  			else printw(".");
 		}
 		printw("\n");
+	}
+}
+void inccolor(unsigned char *p){
+	if (*p == 0xc0) *p = 0xff;
+	else if (*p > 0xc0) *p = 0x00;
+	else *p = *p + 0x40;
+}
+
+void shift(struct pixel *frames, unsigned z, char dir)
+{
+	struct pixel *frames_copy;
+	struct pixel *a;
+	struct pixel *b;
+
+	unsigned long size2 = pixels * revs * sizeof(struct pixel);
+	frames_copy = malloc(size2);
+	memset(frames_copy, 0x00, size2);
+
+	unsigned i,j;
+	unsigned tmp, tmp2;
+	unsigned vx, vy;
+	switch (dir){
+		case 'u':
+			vx = 0;
+			vy = -1;
+			break;
+		case 'd':
+			vx = 0;
+			vy = 1;
+			break;
+		case 'l':
+			vx = -1;
+			vy = 0;
+			break;
+		case 'r':
+			vx = 1;
+			vy = 0;
+			break;
+	}
+	for (i = 0; i < pixels; ++i){
+		for (j = 0; j < revs; ++j){
+
+			if (dir == 'u' && i == 0) tmp = pixels - 1;
+			else if (dir == 'd' && i == pixels - 1) tmp = 0;
+			else tmp = i + vy;
+			
+			if (dir == 'l' && j == 0) tmp2 = revs - 1;
+			else if (dir == 'r' && j == revs - 1) tmp2 = 0;
+			else tmp2 = j + vx;
+			
+			a = getPixel(frames, i, j, z);
+			b = getPixel(frames_copy, tmp, tmp2, z);
+			b->r = a->r;
+			b->g = a->g;
+			b->b = a->b;
+		}
+	}
+	for (i = 0; i < pixels; ++i){
+		for (j = 0; j < revs; ++j){
+			a = getPixel(frames, i, j, z);
+			b = getPixel(frames_copy, i, j, z); 
+			a->r = b->r;
+			a->g = b->g;
+			a->b = b->b;						
+		}
+	}
+	free(frames_copy);
+}
+
+void copy_next (struct pixel *frames, unsigned z)
+{
+	unsigned next;
+	struct pixel *a;
+	struct pixel *b;
+	unsigned i,j;
+	next = (z + 1) % total_frames;
+	for (i = 0; i < pixels; ++i){
+		for (j = 0; j < revs; ++j){
+			b = getPixel(frames, i, j, z);
+			a = getPixel(frames, i, j, next); 
+			a->r = b->r;
+			a->g = b->g;
+			a->b = b->b;						
+		}
 	}
 }
 
@@ -118,7 +202,16 @@ int main(){
 	initscr();
 	noecho();
 	unsigned y, x, xb;
-	printw("ijkl - move cursor\nenter - change value\ns - save\nu/o - change frames\nq - quit\n");
+	printw("i/j/k/l - move cursor [+shift: fast]\n");
+	printw("u/o - move between frames\n");
+	printw("enter - edit color value\n");
+	printw("\nr/g/b - increment color value\n");
+	printw("h - increment white value\n");
+	printw("x - clear pixel\n");
+	printw("\nw/a/s/d - shift frame up/left/down/right\n");
+	printw("c - copy to next frame\n");
+	printw("\nshift-s - save\n");
+	printw("q - quit\n");
 	keypad(stdscr, TRUE);
 	getch();
 	move(0,0);
@@ -145,6 +238,8 @@ int main(){
 	{
 		ch = getch();
 		getyx(stdscr, y, x);
+		move(VSPACE + pixels + 1,0);
+		printw("\n\n");
 		my = y - VSPACE;
 		mx = x;
 		switch(ch)
@@ -191,7 +286,7 @@ int main(){
 				else ++z;
 				refresh_data(frames, z);
 				break;
-			case 0xa:
+			case 0xa: //enter
 				xb = mx;
 				move(pixels+VSPACE+1, 0);
 				q = getPixel(frames, my, mx, z);
@@ -213,18 +308,17 @@ int main(){
 				noecho();
 				mx = xb;
 				break;
-			case 0x73:
+			case 'S':
 				move(pixels + VSPACE + 1,0);
 				printw("Saved.");
 				save(fp, frames);
-				refresh();
-				getch();
 				break;
-			case 0x71:
+			case 'q':
 				move(pixels + VSPACE + 1,0);
 				printw("Save (s) Quit (q)");
 				m = getch();
 				switch(m){
+					case 'S':
 					case 0x73:
 						save(fp, frames);
 						done = 1;
@@ -237,13 +331,73 @@ int main(){
 						printw("\n");
 				}
 				break;
+			case 'r':
+				q = getPixel(frames, my, mx, z);
+				inccolor(&(q->r));
+				refresh_data(frames, z);
+				move(pixels + VSPACE + 1,0);
+				printw("Pixel color: 0x%02x%02x%02x", q->r,q->g,q->b);
+				break;
+			case 'g':
+				q = getPixel(frames, my, mx, z);
+				inccolor(&(q->g));
+				refresh_data(frames, z);
+				move(pixels + VSPACE + 1,0);
+				printw("Pixel color: 0x%02x%02x%02x", q->r,q->g,q->b);
+				break;
+			case 'b':
+				q = getPixel(frames, my, mx, z);
+				inccolor(&(q->b));
+				refresh_data(frames, z);
+				move(pixels + VSPACE + 1,0);
+				printw("Pixel color: 0x%02x%02x%02x", q->r,q->g,q->b);
+				break;
+			case 'h':
+				q = getPixel(frames, my, mx, z);
+				inccolor(&(q->b));
+				inccolor(&(q->g));
+				inccolor(&(q->r));
+				refresh_data(frames, z);
+				move(pixels + VSPACE + 1,0);
+				printw("Pixel color: 0x%02x%02x%02x", q->r,q->g,q->b);
+				break;
+			case 'x':
+				q = getPixel(frames, my, mx, z);
+				q->r = 0x00;
+				q->g = 0x00;
+				q->b = 0x00;
+				refresh_data(frames, z);
+				move(pixels + VSPACE + 1,0);
+				printw("Pixel color: 0x%02x%02x%02x", q->r,q->g,q->b);
+				break;
+			case 'w':
+				shift(frames, z, 'u');
+				refresh_data(frames,z);
+				break;
+			case 'a':
+				shift(frames, z, 'l');
+				refresh_data(frames,z);
+				break;
+			case 's':
+				shift(frames, z, 'd');
+				refresh_data(frames,z);
+				break;
+			case 'd':
+				shift(frames, z, 'r');
+				refresh_data(frames,z);
+				break;
+			case 'c':
+				copy_next(frames,z);
+				move(pixels + VSPACE + 1,0);
+				printw("Copied to next frame.");
+				break;
 		}
 		x = mx;
 		y = my + VSPACE;
 		move(pixels + VSPACE,0);
 		printw("\n");
 		move(pixels + VSPACE,0);
-		printw("x: %d, y: %d, frame: %d\n\n",mx, my, z);
+		printw("x: %d, y: %d, frame: %d",mx, my, z);
 		move (y, x);
 		refresh();
 	}

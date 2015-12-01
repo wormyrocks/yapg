@@ -147,7 +147,6 @@ int main() {
 		
 		if (revnum == revs - 1){
 			++revolutions;
-			exit(1);
 		}
 		if (revolutions == speed){
 			revolutions = 0;
