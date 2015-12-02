@@ -5,8 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdint.h>
-
-
+#include <signal.h>
 
 #define PI 3.14159265
 
@@ -82,14 +81,22 @@ void lightUp(struct pixel *frames, int revnum, int framenum){
 
 }
 
+void sighandler (int sig){
+		if (LEDOUT) digitalWrite(22, 0);
+		exit(0);
+}
 
 int main() {
-
+    signal(SIGINT, sighandler);
 	if (LEDOUT){
 		pioInit();
-		pinMode(20, OUTPUT);
-		spiInit(1000000);
-		digitalWrite(20, 1);
+		spiInit(10000);
+		pinMode(22, OUTPUT);
+		pinMode(27, OUTPUT);
+		pinMode(27, 1);
+		delayMicros(10000);
+		pinMode(27, 0);
+		digitalWrite(22, 1);
 		delayMicros(1000000);
 	}
 	
@@ -137,7 +144,7 @@ int main() {
 	int delay = 1000000 * 60 / (revs * RPM);
 	int framenum = 0;
 
-	while(revolutions < 2){
+	while(1){
 
 		lightUp(frames,revnum, framenum);
 		
