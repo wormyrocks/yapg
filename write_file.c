@@ -40,7 +40,7 @@ void save(FILE *fp, struct pixel *frames){
 	fwrite(frames, sizeof(char), size, fp);
 }
 
-void refresh_data(struct pixel *frames, unsigned z){
+void refresh_data(struct pixel *frames, unsigned z, unsigned onion_skin){
 	move(VSPACE,0);
 	unsigned i,j,k;
 	struct pixel *p;
@@ -49,7 +49,13 @@ void refresh_data(struct pixel *frames, unsigned z){
 		for (j = 0; j < revs; ++j){
 			p = getPixel(frames, i, j, z);
  			if (p->r + p->g + p->b > 0) printw("o");
- 			else printw(".");
+ 			else if (onion_skin){
+ 				if (z == 0) p = getPixel(frames, i, j, total_frames - 1);
+ 				else p = getPixel(frames, i, j, z - 1);
+	 			if (p->r + p->g + p->b > 0) printw(".");
+	 			else printw(" ");
+ 			}
+ 			else printw(" ");
 		}
 		printw("\n");
 	}
@@ -121,17 +127,15 @@ void shift(struct pixel *frames, unsigned z, char dir)
 	free(frames_copy);
 }
 
-void copy_next (struct pixel *frames, unsigned z)
+void copy_frame (struct pixel *frames, unsigned dest, unsigned z)
 {
-	unsigned next;
 	struct pixel *a;
 	struct pixel *b;
 	unsigned i,j;
-	next = (z + 1) % total_frames;
 	for (i = 0; i < pixels; ++i){
 		for (j = 0; j < revs; ++j){
 			b = getPixel(frames, i, j, z);
-			a = getPixel(frames, i, j, next); 
+			a = getPixel(frames, i, j, dest); 
 			a->r = b->r;
 			a->g = b->g;
 			a->b = b->b;						
@@ -202,16 +206,17 @@ int main(){
 	initscr();
 	noecho();
 	unsigned y, x, xb;
-	printw("i/j/k/l - move cursor [+shift: fast]\n");
-	printw("u/o - move between frames\n");
-	printw("enter - edit color value\n");
-	printw("\nr/g/b - increment color value\n");
-	printw("h - increment white value\n");
-	printw("x - clear pixel\n");
-	printw("\nw/a/s/d - shift frame up/left/down/right\n");
-	printw("c - copy to next frame\n");
-	printw("\nshift-s - save\n");
-	printw("q - quit\n");
+	printw("[i/j/k/l] move cursor [+shift: fast]\n");
+	printw("[u/o] move between frames\n");
+	printw("[enter] edit color value\n");
+	printw("\n[r/g/b] increment color value\n");
+	printw("[h] increment white value\n");
+	printw("[x] clear pixel\n");
+	printw("\n[w/a/s/d] shift frame up/left/down/right\n");
+	printw("[c] copy frame\n");
+	printw("[m] onion skin view\n");
+	printw("\n[shift-s] save\n");
+	printw("[q] quit\n");
 	keypad(stdscr, TRUE);
 	getch();
 	move(0,0);
@@ -222,13 +227,14 @@ int main(){
 	unsigned my = 0, mx = 0;
 	char str[6];
 
+	unsigned onion_skin = 0;
 	unsigned ch, m;
 	unsigned done;
 	done = 0;
-	printw("striplen %d pixels/rev %d framerate %d num. frames %d\n", pixels,revs,speed,total_frames);
+	printw("vert: %d horiz: %d speed: %d frames %d\n", pixels,revs,speed,total_frames);
 	struct pixel *q;
 
-	refresh_data(frames, z);
+	refresh_data(frames, z, onion_skin);
 	move(pixels + VSPACE, 0);
 	printw("\n");
 	move(pixels + VSPACE, 0);
@@ -279,12 +285,12 @@ int main(){
 			case 0x75:
 				if (z == 0) z = total_frames - 1;
 				else --z;
-				refresh_data(frames, z);
+				refresh_data(frames, z, onion_skin);
 				break;
 			case 0x6f:
 				if (z == total_frames - 1) z = 0;
 				else ++z;
-				refresh_data(frames, z);
+				refresh_data(frames, z, onion_skin);
 				break;
 			case 0xa: //enter
 				xb = mx;
@@ -292,7 +298,7 @@ int main(){
 				q = getPixel(frames, my, mx, z);
 				unsigned rgb;
 
-				printw("Pixel color: 0x%02x%02x%02x\nNew value:   0x", q->r,q->g,q->b);
+				printw("pixel color: 0x%02x%02x%02x\nNew value:   0x", q->r,q->g,q->b);
 				move(pixels + VSPACE + 2, 15);
 				echo();
 				getnstr(str, 6);
@@ -301,7 +307,7 @@ int main(){
 					q->r = (rgb & 0xff0000) >> 0x10;
 					q->g = (rgb & 0x00ff00) >> 0x8;
 					q->b = (rgb & 0x0000ff);
-					refresh_data(frames,z);
+					refresh_data(frames,z,onion_skin);
 				}
 				move(pixels + VSPACE + 1,0);
 				printw("\n\n");
@@ -315,7 +321,7 @@ int main(){
 				break;
 			case 'q':
 				move(pixels + VSPACE + 1,0);
-				printw("Save (s) Quit (q)");
+				printw("Save [s] Don't Save [q]");
 				m = getch();
 				switch(m){
 					case 'S':
@@ -334,21 +340,21 @@ int main(){
 			case 'r':
 				q = getPixel(frames, my, mx, z);
 				inccolor(&(q->r));
-				refresh_data(frames, z);
+				refresh_data(frames, z, onion_skin);
 				move(pixels + VSPACE + 1,0);
 				printw("Pixel color: 0x%02x%02x%02x", q->r,q->g,q->b);
 				break;
 			case 'g':
 				q = getPixel(frames, my, mx, z);
 				inccolor(&(q->g));
-				refresh_data(frames, z);
+				refresh_data(frames, z, onion_skin);
 				move(pixels + VSPACE + 1,0);
 				printw("Pixel color: 0x%02x%02x%02x", q->r,q->g,q->b);
 				break;
 			case 'b':
 				q = getPixel(frames, my, mx, z);
 				inccolor(&(q->b));
-				refresh_data(frames, z);
+				refresh_data(frames, z, onion_skin);
 				move(pixels + VSPACE + 1,0);
 				printw("Pixel color: 0x%02x%02x%02x", q->r,q->g,q->b);
 				break;
@@ -357,7 +363,7 @@ int main(){
 				inccolor(&(q->b));
 				inccolor(&(q->g));
 				inccolor(&(q->r));
-				refresh_data(frames, z);
+				refresh_data(frames, z, onion_skin);
 				move(pixels + VSPACE + 1,0);
 				printw("Pixel color: 0x%02x%02x%02x", q->r,q->g,q->b);
 				break;
@@ -366,30 +372,56 @@ int main(){
 				q->r = 0x00;
 				q->g = 0x00;
 				q->b = 0x00;
-				refresh_data(frames, z);
+				refresh_data(frames, z, onion_skin);
 				move(pixels + VSPACE + 1,0);
 				printw("Pixel color: 0x%02x%02x%02x", q->r,q->g,q->b);
 				break;
 			case 'w':
 				shift(frames, z, 'u');
-				refresh_data(frames,z);
+				refresh_data(frames, z, onion_skin);
 				break;
 			case 'a':
 				shift(frames, z, 'l');
-				refresh_data(frames,z);
+				refresh_data(frames, z, onion_skin);
 				break;
 			case 's':
 				shift(frames, z, 'd');
-				refresh_data(frames,z);
+				refresh_data(frames, z, onion_skin);
 				break;
 			case 'd':
 				shift(frames, z, 'r');
-				refresh_data(frames,z);
+				refresh_data(frames, z, onion_skin);
 				break;
 			case 'c':
-				copy_next(frames,z);
+				xb = mx;
+				move(pixels+VSPACE+1, 0);
+				printw("Copy to frame: ");
+				move(pixels + VSPACE + 1, 15);
+				echo();
+				getnstr(str, 3);
+				unsigned frame_dest;
+				if (sscanf(str, "%u", &frame_dest) == 1 & frame_dest < total_frames){
+					copy_frame(frames, frame_dest, z);
+					refresh_data(frames,z,onion_skin);
+				}
 				move(pixels + VSPACE + 1,0);
-				printw("Copied to next frame.");
+				printw("\n\n");
+				noecho();
+				mx = xb;
+				break;
+			case 'm':
+				onion_skin = !onion_skin;
+				refresh_data(frames, z, onion_skin);
+				move(pixels + VSPACE + 1,0);
+				printw("Onion skin mode ");
+				switch (onion_skin){
+					case 0:
+						printw("off.");
+						break;
+					case 1:
+						printw("on.");
+						break;
+				}
 				break;
 		}
 		x = mx;
