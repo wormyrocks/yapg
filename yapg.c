@@ -9,10 +9,10 @@
 
 #define PI 3.14159265
 
-#define LEDOUT 0
-#define DEBUG 1
+#define LEDOUT 1
+#define DEBUG 0
 
-#define RPM 500
+#define RPM 400
 
 #define RGB(r, g, b) ((struct pixel) {r, g, b})
 
@@ -82,7 +82,19 @@ void lightUp(struct pixel *frames, int revnum, int framenum){
 }
 
 void sighandler (int sig){
-		if (LEDOUT) digitalWrite(22, 0);
+		if (LEDOUT){
+			digitalWrite(22, 0);
+			initFrame();
+			int i;
+			struct pixel *p;
+			p->r = 0x00;
+			p->g = 0x00;
+			p->b = 0x00;
+			for (i = 0; i < pixels; ++i){
+				setLED(p);
+			}
+			endFrame();
+		}
 		exit(0);
 }
 
@@ -90,7 +102,7 @@ int main() {
     signal(SIGINT, sighandler);
 	if (LEDOUT){
 		pioInit();
-		spiInit(10000);
+		spiInit(800000);
 		pinMode(22, OUTPUT);
 		pinMode(27, OUTPUT);
 		pinMode(27, 1);
@@ -99,8 +111,7 @@ int main() {
 		digitalWrite(22, 1);
 		delayMicros(1000000);
 	}
-	
-	int revnum = 0;
+
 
 	//	frames per revolution: FRAMES
 	// 	revolutions per second: RPM/60
@@ -140,19 +151,20 @@ int main() {
 		printf("not found.\n");
 	}
 	}while (!done);
-	
+
+	int revnum = revs - 1;
 	int delay = 1000000 * 60 / (revs * RPM);
 	int framenum = 0;
 
 	while(1){
 
 		lightUp(frames,revnum, framenum);
-		
+
 		if (LEDOUT) delayMicros(delay);
-		
-		revnum = ((revnum + 1) % revs);
-		
-		if (revnum == revs - 1){
+		if (revnum == 0) revnum = revs - 1;
+		else revnum = revnum - 1;
+
+		if (revnum == 0){
 			++revolutions;
 		}
 		if (revolutions == speed){
@@ -160,7 +172,7 @@ int main() {
 			framenum = ((framenum + 1)%total_frames);
 		}
 	}
-	
+
 	printf("\n");
 	return(0);
 }
