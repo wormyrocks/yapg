@@ -9,22 +9,24 @@
 ///////////////////////////////////////////////////////////
 
 
-module motor_control(input logic encoder, clk, reset,
+module motor_control(input logic encoder, clk, reset, motor_on,
                      output logic signal);
   //Read the data from the encoder
-  logic [31:0] period;
+  logic signed [31:0] period;
   read_encoder read_encoder(encoder,clk,reset,period);
 
   //Run the data from the encoder through a control loop to 
   //determine the output of the system to the motor.
-  logic [31:0] desired_period;
-  assign desired_period = 32'h0004E20;
+  logic signed [31:0] desired_period;
+  assign desired_period = 32'h00072F1;
   logic[9:0] duty_cycle;
-  control_loop control_loop(period,desired_period,duty_cycle);
+  PI_control_loop control_loop(clk,reset,period,desired_period,duty_cycle);
   
+  logic[9:0] motor_duty_cycle;
+  assign motor_duty_cycle = motor_on ? duty_cycle : 10'b0;
   //Set up the 10-bit PWM at 4.88kHz to control the motor
   //based on the output of the control loop.
-  PWM #(10,3) PWM(duty_cycle,clk,reset,signal);	
+  PWM #(10,3) PWM(motor_duty_cycle,clk,reset,signal);	
   
 endmodule
 
@@ -37,7 +39,7 @@ endmodule
 //updates the most recent period in clock cycles         //
 ///////////////////////////////////////////////////////////
 module read_encoder(input logic encoder, clk, reset,
-                    output logic [31:0] period);
+                    output logic signed [31:0] period);
   //save the current and previous values of the encoder
   //so that we can catch the rising edge
   logic prev_encoder, synch_encoder;
@@ -69,11 +71,38 @@ endmodule
 //                                                       //
 //TODO: WRITE DETAILS                                    //
 ///////////////////////////////////////////////////////////
-module control_loop(input logic [31:0] period, desired_period,
+module control_loop(input logic signed [31:0] period, desired_period,
                     output logic [9:0] duty_cycle);
-  logic [31:0] err;
+  logic signed [31:0] err;
   assign err = desired_period - period;
   assign duty_cycle = err[31] ? 10'b_11_1111_1111 : 10'b0;
+						  
+endmodule
+
+///////////////////////////////////////////////////////////
+// PI_control_loop                                          //
+//                                                       //
+//This module implements our motor control loop.         //
+//                                                       //
+//TODO: WRITE DETAILS                                    //
+///////////////////////////////////////////////////////////
+module PI_control_loop(input logic clk, reset,
+                       input logic signed [31:0] period, desired_period,
+                       output logic [9:0] duty_cycle);
+  logic signed [31:0] err,i,out;
+  assign err = desired_period - period;
+  
+  
+  always_ff @(posedge clk, posedge reset) begin
+    if (reset) i <= 32'b0;
+	 else i <= err + i;
+  end
+  
+  assign out = err >>> 'd7  + i >>> 'd8;
+  always_comb 
+    if (out < 32'b0) duty_cycle = 10'b0;
+	 else if (out > 32'b_11_1111_1111) duty_cycle = 10'b_11_1111_1111;
+	 else duty_cycle = out[9:0];
 						  
 endmodule
 
