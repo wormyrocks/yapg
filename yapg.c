@@ -9,10 +9,9 @@
 
 #define PI 3.14159265
 
-#define LEDOUT 0
-#define DEBUG 1
-
-#define RPM 500
+#define LEDOUT 1
+#define DEBUG 0
+#define RPM 364
 
 #define RGB(r, g, b) ((struct pixel) {r, g, b})
 
@@ -82,7 +81,20 @@ void lightUp(struct pixel *frames, int revnum, int framenum){
 }
 
 void sighandler (int sig){
-		if (LEDOUT) digitalWrite(22, 0);
+		if (LEDOUT){
+			digitalWrite(22, 0);
+			delayMicros(1000000);
+			int i;
+			struct pixel *p;
+			p->r = 0x00;
+			p->g = 0x00;
+			p->b = 0x00;
+			initFrame();
+			for (i = 0; i < pixels; ++i){
+				setLED(p);
+			}
+			endFrame();
+		}
 		exit(0);
 }
 
@@ -90,17 +102,14 @@ int main() {
     signal(SIGINT, sighandler);
 	if (LEDOUT){
 		pioInit();
-		spiInit(10000);
+		spiInit(1000000);
 		pinMode(22, OUTPUT);
 		pinMode(27, OUTPUT);
 		pinMode(27, 1);
 		delayMicros(10000);
 		pinMode(27, 0);
-		digitalWrite(22, 1);
-		delayMicros(1000000);
 	}
-	
-	int revnum = 0;
+
 
 	//	frames per revolution: FRAMES
 	// 	revolutions per second: RPM/60
@@ -108,10 +117,13 @@ int main() {
 	// 	seconds per frame: 60/FRAMES/RPM
 	// 	microseconds per frame: 1000000 * 60 / FRAMES / RPM
 
+	//unsigned rpm;
+	//printf("Enter rpm: ");
+	//scanf("%u",rpm);
 	unsigned revolutions = 0;
-
+	//rpm = 500;
 	struct pixel *frames;
-	
+
 	char fname[64];
 	int done = 0;
 	FILE *fp;
@@ -120,12 +132,11 @@ int main() {
 		scanf("%s",fname);
 		strcat(fname, ".led");
 
-	if( access( fname, F_OK ) != -1 ) {	
+	if( access( fname, F_OK ) != -1 ) {
 		fp = fopen(fname, "r");
 		fscanf(fp, "%c%c%c%c", &pixels, &revs, &speed, &total_frames);
 		char junk;
 		fscanf(fp, "%c%c%c%c", &junk, &junk, &junk, &junk);
-		
 		unsigned long size = pixels * revs * total_frames * sizeof(struct pixel);
 		frames = malloc(size);
 		if (!frames){
@@ -140,19 +151,21 @@ int main() {
 		printf("not found.\n");
 	}
 	}while (!done);
-	
+	digitalWrite(22,1);
+	delayMicros(1000000);
+	int revnum = revs - 1;
 	int delay = 1000000 * 60 / (revs * RPM);
 	int framenum = 0;
-
+	printf("%i\n",delay);
 	while(1){
 
 		lightUp(frames,revnum, framenum);
-		
+
 		if (LEDOUT) delayMicros(delay);
-		
-		revnum = ((revnum + 1) % revs);
-		
-		if (revnum == revs - 1){
+		if (revnum == 0) revnum = revs - 1;
+		else revnum = revnum - 1;
+
+		if (revnum == 0){
 			++revolutions;
 		}
 		if (revolutions == speed){
@@ -160,7 +173,7 @@ int main() {
 			framenum = ((framenum + 1)%total_frames);
 		}
 	}
-	
+
 	printf("\n");
 	return(0);
 }
