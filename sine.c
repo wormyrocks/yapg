@@ -5,7 +5,7 @@
 
 #define PI 3.14159265358
 
-uint8_t leds, revs, speed, totalframes;
+unsigned char leds, revs, speed, totalframes;
 
 
 struct pixel {
@@ -21,9 +21,9 @@ struct pixel *getPixel(struct pixel *frames, int i, int j, int k){
 
 
 int main(){
-	leds = 72;
-	revs = 40;
-	speed = 3;
+	leds = 60;
+	revs = 120;
+	speed = 1;
 	int sinx;
 	int amplitude = leds/2-1;
 	totalframes = amplitude * 2;
@@ -40,10 +40,23 @@ int main(){
 
 	int dir = -2;
 	int i,j;
-	
+
 	for (j = 0; j < totalframes; ++j){
 		for (i = 0; i < revs; ++i){
 			int sinx = (int)(.5+leds/2 + amp * (sin(PI * i * 2.0 / (revs / 2.0))));
+			int k,l;
+			for (k = 0; k < sinx; ++k){
+				p = getPixel(frames, k, i, j);
+				p->r = 0x00;
+				p->g = 0xcc;
+				p->b = 0x99;
+			}
+			for (l = sinx; l < leds; ++l){
+				p = getPixel(frames, l, i, j);
+				p->r = 0xff;
+				p->g = 0x33;
+				p->b = 0x66;
+			}
 			p = getPixel(frames, sinx, i, j);
 			p->r = 0xff;
 			p->g = 0xff;
