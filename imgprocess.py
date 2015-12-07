@@ -8,7 +8,7 @@ pix = im.load()
 width = im.size[0]
 height = im.size[1]
 
-header = [60, 121, 1, 1, 0, 0, 0, 0]
+header = [height, width, 1, 1, 0, 0, 0, 0]
 
 data = header;
 
