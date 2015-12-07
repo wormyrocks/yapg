@@ -113,3 +113,7 @@ void delayMicros (unsigned int micros){ // time delay in microseconds
 	timer[0] = 0b0010;
 	while(!(timer[0] & 0b0010));
 }
+
+int getTime(){
+	return timer[1];
+}

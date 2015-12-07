@@ -11,18 +11,9 @@
 
 #define LEDOUT 1
 #define DEBUG 0
-#define RPM 364
+#define RPM 500
 
-#define RGB(r, g, b) ((struct pixel) {r, g, b})
-
-#define RED RGB(0xff, 0, 0)
-#define GREEN RGB(0, 0xff, 0)
-#define BLUE RGB(0, 0, 0xff)
-
-#define WHITE RGB(0xff,0xff,0xff)
-#define WHITE_64 RGB(0x80,0x80,0x80)
-
-uint8_t pixels, revs, total_frames, speed;
+unsigned char pixels, revs, total_frames, speed;
 
 struct pixel {
 	unsigned char r, g, b;
@@ -83,15 +74,15 @@ void lightUp(struct pixel *frames, int revnum, int framenum){
 void sighandler (int sig){
 		if (LEDOUT){
 			digitalWrite(22, 0);
-			delayMicros(1000000);
+			delayMicros(100000);
 			int i;
-			struct pixel *p;
-			p->r = 0x00;
-			p->g = 0x00;
-			p->b = 0x00;
+			struct pixel p;
+			p.r = 0x00;
+			p.g = 0x00;
+			p.b = 0x00;
 			initFrame();
 			for (i = 0; i < pixels; ++i){
-				setLED(p);
+				setLED(&p);
 			}
 			endFrame();
 		}
@@ -99,15 +90,16 @@ void sighandler (int sig){
 }
 
 int main() {
-    signal(SIGINT, sighandler);
+	signal(SIGINT, sighandler);
+	unsigned int time_1;
 	if (LEDOUT){
 		pioInit();
-		spiInit(1000000);
+		spiInit(10000000);
 		pinMode(22, OUTPUT);
 		pinMode(27, OUTPUT);
-		pinMode(27, 1);
+		digitalWrite(27, 1);
 		delayMicros(10000);
-		pinMode(27, 0);
+		digitalWrite(27, 0);
 	}
 
 
@@ -151,17 +143,17 @@ int main() {
 		printf("not found.\n");
 	}
 	}while (!done);
+
 	digitalWrite(22,1);
-	delayMicros(1000000);
+//	delayMicros(10000000);
+
 	int revnum = revs - 1;
 	int delay = 1000000 * 60 / (revs * RPM);
 	int framenum = 0;
-	printf("%i\n",delay);
 	while(1){
-
+		time_1 = getTime();
 		lightUp(frames,revnum, framenum);
 
-		if (LEDOUT) delayMicros(delay);
 		if (revnum == 0) revnum = revs - 1;
 		else revnum = revnum - 1;
 
@@ -172,9 +164,9 @@ int main() {
 			revolutions = 0;
 			framenum = ((framenum + 1)%total_frames);
 		}
+		while (getTime() < time_1 + delay){};
 	}
 
 	printf("\n");
 	return(0);
 }
-
