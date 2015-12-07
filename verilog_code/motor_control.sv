@@ -5,12 +5,13 @@
 //from the encoder, passes that through a control loop,  //
 //and then outputs the result as a PWM signal            //
 //                                                       //
-//CONTROL LOOP IS NOT IMPLEMENTED YET                    //
+//                                                       //
 ///////////////////////////////////////////////////////////
 
 
 module motor_control(input logic encoder, clk, reset, motor_on,
-                     output logic signal);
+                     output logic signal,
+							output logic [1:0] error_leds);
   //Read the data from the encoder
   logic signed [31:0] period;
   read_encoder read_encoder(encoder,clk,reset,period);
@@ -20,9 +21,9 @@ module motor_control(input logic encoder, clk, reset, motor_on,
   logic control_clk;
   clock_divider #(10) control_clk_generator(clk,control_clk);
   logic signed [31:0] desired_period;
-  assign desired_period = 32'h00072F1;
+  assign desired_period = 32'd20597; //500RPM
   logic[9:0] duty_cycle;
-  PI_control_loop control_loop(control_clk,reset,period,desired_period,duty_cycle);
+  PI_control_loop control_loop(control_clk,reset,period,desired_period,duty_cycle,error_leds);
   
   logic[9:0] motor_duty_cycle;
   assign motor_duty_cycle = motor_on ? duty_cycle : 10'b0;
@@ -48,7 +49,7 @@ module read_encoder(input logic encoder, clk, reset,
   logic [31:0] counter;
   always_ff @(posedge clk, posedge reset) begin
     if (reset)
-	   period <= 32'h7FFF_FFFF;
+	   period <= 32'h072F1;
 	 else begin
       prev_encoder <= synch_encoder;
       synch_encoder <= encoder;
@@ -67,44 +68,43 @@ module read_encoder(input logic encoder, clk, reset,
 endmodule
 
 ///////////////////////////////////////////////////////////
-// control_loop                                          //
+// PI_control_loop                                       //
 //                                                       //
 //This module implements our motor control loop.         //
-//                                                       //
-//TODO: WRITE DETAILS                                    //
-///////////////////////////////////////////////////////////
-module control_loop(input logic signed [31:0] period, desired_period,
-                    output logic [9:0] duty_cycle);
-  logic signed [31:0] err;
-  assign err = desired_period - period;
-  assign duty_cycle = err[31] ? 10'b_11_1111_1111 : 10'b0;
-						  
-endmodule
-
-///////////////////////////////////////////////////////////
-// PI_control_loop                                          //
-//                                                       //
-//This module implements our motor control loop.         //
-//                                                       //
-//TODO: WRITE DETAILS                                    //
+//We are running a PI control loop to get the motor to   //
+//stablize at the desired rotation rate.                 //
+//The integral term is needed to remove steady state     //
+//error, but only used once we are close to the desired  //
+//period.                                                //
 ///////////////////////////////////////////////////////////
 module PI_control_loop(input logic clk, reset,
                        input logic signed [31:0] period, desired_period,
-                       output logic [9:0] duty_cycle);
+                       output logic [9:0] duty_cycle,
+							  output logic [1:0] error);
   logic signed [31:0] err,i,out;
-  assign err = desired_period - period;
+  assign err = period - desired_period;
   
   
   always_ff @(posedge clk, posedge reset) begin
-    if (reset) i <= 32'b0;
-	 else i <= err + i;
+   if (reset) i <= 32'b0;
+   else if (i < $signed(32'b0)) i <= 32'b0;
+   else if (err < $signed(32'hFFF) && err > $signed(-32'hFFF)) i <= err + i;
   end
   
-  assign out = err >>> 'd5  + i >>> 'd8;
+  assign out = (err >>> 'd3) + (i >>> 'd14);
   always_comb 
-    if (out < 32'b0) duty_cycle = 10'b0;
-	 else if (out > 32'b_11_1111_1111) duty_cycle = 10'b_11_1111_1111;
-	 else duty_cycle = out[9:0];
+    if (out < $signed(32'b0)) begin
+	   duty_cycle = 10'b0;
+		error = 2'b01;
+	 end
+	 else if (out > $signed(32'b_11_1000_0000)) begin
+	   duty_cycle = 10'b_11_1000_0000;
+		error = 2'b10;
+	 end
+	 else begin
+	   duty_cycle = out[9:0];
+	   error = 2'b00;
+	 end
 						  
 endmodule
 
