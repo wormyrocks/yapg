@@ -17,10 +17,12 @@ module motor_control(input logic encoder, clk, reset, motor_on,
 
   //Run the data from the encoder through a control loop to 
   //determine the output of the system to the motor.
+  logic control_clk;
+  clock_divider #(10) control_clk_generator(clk,control_clk);
   logic signed [31:0] desired_period;
   assign desired_period = 32'h00072F1;
   logic[9:0] duty_cycle;
-  PI_control_loop control_loop(clk,reset,period,desired_period,duty_cycle);
+  PI_control_loop control_loop(control_clk,reset,period,desired_period,duty_cycle);
   
   logic[9:0] motor_duty_cycle;
   assign motor_duty_cycle = motor_on ? duty_cycle : 10'b0;
@@ -98,7 +100,7 @@ module PI_control_loop(input logic clk, reset,
 	 else i <= err + i;
   end
   
-  assign out = err >>> 'd7  + i >>> 'd8;
+  assign out = err >>> 'd5  + i >>> 'd8;
   always_comb 
     if (out < 32'b0) duty_cycle = 10'b0;
 	 else if (out > 32'b_11_1111_1111) duty_cycle = 10'b_11_1111_1111;
@@ -168,4 +170,16 @@ module PWM #(parameter N = 10, CLK_DIV = 32)
     if (lower_signal) signal <= 1'b0;
 	 else if (raise_signal) signal <= 1'b1;
 	 
+endmodule
+
+
+module clock_divider #(parameter CLK_DIV = 32) 
+                      (input logic clk, output logic slow_clk);
+  logic [CLK_DIV-1:0] slow_clk_counter; //the counter used to slow down the clock
+  
+  //set up the slow clock and reset logic
+  always_ff @(posedge clk) begin
+    slow_clk_counter <= slow_clk_counter + 1'b1;
+    slow_clk <= slow_clk_counter[CLK_DIV-1];
+  end
 endmodule
