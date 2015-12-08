@@ -24,9 +24,6 @@ struct pixel {
 
 struct pixel *getPixel(struct pixel *frames, unsigned i, unsigned j, unsigned k){
 	unsigned addr = i + j * pixels + k * pixels * revs;
-// 	11 / 1
-// 	51 / 0
-// 	printf("start%d %d %u ", i,j,addr);
 	return frames + addr;
 }
 
@@ -103,17 +100,13 @@ int main() {
 	}
 
 
-	//	frames per revolution: FRAMES
-	// 	revolutions per second: RPM/60
+	//	frames per revolution: revs
+	// 	revolutions per second: revs/60
 	// 	seconds per revolution: 60/RPM
-	// 	seconds per frame: 60/FRAMES/RPM
-	// 	microseconds per frame: 1000000 * 60 / FRAMES / RPM
+	// 	seconds per frame: 60/revs/RPM
+	// 	microseconds per frame: 1000000 * 60 / (revs * RPM)
 
-	//unsigned rpm;
-	//printf("Enter rpm: ");
-	//scanf("%u",rpm);
 	unsigned revolutions = 0;
-	//rpm = 500;
 	struct pixel *frames;
 
 	char fname[64];
@@ -145,7 +138,6 @@ int main() {
 	}while (!done);
 
 	digitalWrite(22,1);
-//	delayMicros(10000000);
 
 	int revnum = revs - 1;
 	int delay = 1000000 * 60 / (revs * RPM);
