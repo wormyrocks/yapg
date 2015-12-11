@@ -52,7 +52,7 @@ void refresh_data(struct pixel *frames, unsigned z, unsigned onion_skin){
  			else if (onion_skin){
  				if (z == 0) p = getPixel(frames, i, j, total_frames - 1);
  				else p = getPixel(frames, i, j, z - 1);
-	 			if (p->r + p->g + p->b > 0) printw(".");
+	 			if (p->r + p->g + p->b > 0) printw(",");
 	 			else printw(".");
  			}
  			else printw(".");

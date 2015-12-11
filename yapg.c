@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <stdint.h>
 #include <signal.h>
+#include <math.h>
 
 #define PI 3.14159265
 
@@ -27,12 +28,18 @@ struct pixel *getPixel(struct pixel *frames, unsigned i, unsigned j, unsigned k)
 	return frames + addr;
 }
 
+unsigned char gamma_correct(unsigned char color){
+	int corrected = pow(color,3)/(255*255);
+	return (unsigned char) corrected;
+}
+
+
 void setLED (struct pixel *p){
 	if (LEDOUT){
 		spiSendReceive(0xff);
-		spiSendReceive(p->b);
-		spiSendReceive(p->g);
-		spiSendReceive(p->r);
+		spiSendReceive(gamma_correct(p->b));
+		spiSendReceive(gamma_correct(p->g));
+		spiSendReceive(gamma_correct(p->r));
 	}
 }
 
