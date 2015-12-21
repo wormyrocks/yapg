@@ -1,5 +1,5 @@
 // evan kahn
-// turns the power supply off
+// turns the motor on
 
 #include "easyPIO.h"
 
