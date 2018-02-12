@@ -33,7 +33,7 @@ while (im):
     except EOFError:
         break
 
-header[3] = framenum
+header[2] = framenum
 
 ba = bytearray(data)
 f.write(ba)
