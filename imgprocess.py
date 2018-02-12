@@ -6,7 +6,6 @@ infile = raw_input("Enter input file: ");
 outfile = raw_input("Enter output file: ");
 f = open (outfile, "wb")
 im = Image.open(infile)
-im = im.convert("RGB")
 width = im.size[0]
 height = im.size[1]
 
@@ -21,7 +20,8 @@ data = header;
 framenum = 0
 
 while (im):
-    pix = im.load()
+    im2 = im.convert("RGB")
+    pix = im2.load()
     for j in range (0, width):
         for i in range (0, height):
             data.append(pix[j,i][0])
