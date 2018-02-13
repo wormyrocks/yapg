@@ -35,6 +35,9 @@ while (im):
 
 header[3] = framenum
 
+val = raw_input("Enter speed (1 is fastest): ")
+header[2] = int(val)
+
 ba = bytearray(data)
 f.write(ba)
 
