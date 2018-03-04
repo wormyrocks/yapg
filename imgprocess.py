@@ -9,12 +9,9 @@ im = Image.open(infile)
 width = im.size[0]
 height = im.size[1]
 
-# f.write(struct.pack("@i", height))
-# f.write(struct.pack("@i", width))
-# f.write(struct.pack("@i", 1))
-# f.write(struct.pack("@i", 1))
-
-header = [height, width, 1, 1, 0, 0, 0, 0]
+val = raw_input("Enter speed (1 is fastest): ")
+speed = int(val)
+header = [height>>8, height & 0xff, width>>8, width & 0xff, speed >> 8, speed & 0xff, 0, 0, 0, 0, 0, 0]
 
 data = header;
 framenum = 0
@@ -33,10 +30,8 @@ while (im):
     except EOFError:
         break
 
-header[3] = framenum
-
-val = raw_input("Enter speed (1 is fastest): ")
-header[2] = int(val)
+header[6] = framenum >> 8
+header[7] = framenum & 0xff
 
 ba = bytearray(data)
 f.write(ba)

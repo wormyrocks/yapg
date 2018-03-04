@@ -14,7 +14,7 @@
 #define DEBUG 0  // turn on for debug prints
 #define RPM 500  // set rotation speed here
 
-unsigned char pixels, revs, total_frames, speed;
+uint16_t pixels, revs, total_frames, speed;
 
 struct pixel {
 	unsigned char r, g, b;
@@ -132,8 +132,13 @@ int main() {
 
 	if( access( fname, F_OK ) != -1 ) {
 		fp = fopen(fname, "r");
-		fscanf(fp, "%c%c%c%c", &pixels, &revs, &speed, &total_frames);
-		char junk;
+        uint8_t p1, p2, r1, r2, s1, s2, f1, f2;
+        fscanf(fp, "%c%c%c%c%c%c%c%c", &p1, &p2, &r1, &r2, &s1, &s2, &f1, &f2);
+        pixels = (p1 << 8) | p2;
+        revs = (r1 << 8) | r2;
+        speed = (s1 << 8) | s2;
+        total_frames = (f1 << 8) | f2;
+        char junk;
 		fscanf(fp, "%c%c%c%c", &junk, &junk, &junk, &junk);
 		unsigned long size = pixels * revs * total_frames * sizeof(struct pixel);
 		frames = malloc(size);
